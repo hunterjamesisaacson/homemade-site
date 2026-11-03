@@ -251,6 +251,8 @@
     outcomeSent = true;
     ampCall(function () {
       amp.track("App Redirect Result", { outcome: outcome, browser: browser, route: "/app" });
+      // send now by beacon: iOS pauses the batch timer once the App Store is in front
+      amp.flush();
     });
   }
 
@@ -274,6 +276,8 @@
   ampCall(function () {
     amp.setTransport("beacon");
     amp.track("App Redirect", { browser: browser, method: method, route: "/app", referrer: document.referrer });
+    // send now by beacon: iOS pauses the batch timer once the App Store is in front
+    amp.flush();
   });
 
   // leaving the page within 6s of landing without having tapped the badge
