@@ -222,8 +222,13 @@
     try { fn(); } catch (e) {}
   }
   // autocapture off so the Homemade project only gets the two events below,
-  // the same two Localize's page sends
-  ampCall(function () { amp.init(AMPLITUDE_API_KEY, { autocapture: false }); });
+  // the same two Localize's page sends. init is async in SDK 2: track and
+  // flush run after its promise, or the flush is a no-op. Remote config off:
+  // nothing here uses it and waiting on its fetch lost events before the jump.
+  var ampReady = null;
+  ampCall(function () {
+    ampReady = amp.init(AMPLITUDE_API_KEY, { autocapture: false, fetchRemoteConfig: false }).promise;
+  });
 
   var ua = navigator.userAgent;
   var isIOS = /iPad|iPhone|iPod/.test(ua) ||
@@ -250,9 +255,11 @@
     if (outcomeSent) return;
     outcomeSent = true;
     ampCall(function () {
-      amp.track("App Redirect Result", { outcome: outcome, browser: browser, route: "/app" });
-      // send now by beacon: iOS pauses the batch timer once the App Store is in front
-      amp.flush();
+      ampReady.then(function () {
+        amp.track("App Redirect Result", { outcome: outcome, browser: browser, route: "/app" });
+        // send now by beacon: iOS pauses the batch timer once the App Store is in front
+        amp.flush();
+      });
     });
   }
 
@@ -273,11 +280,14 @@
   document.getElementById("refresh").addEventListener("click", function () { window.location.reload(); });
 
   // beacon transport survives the redirect below
+  var landingSent = Promise.resolve();
   ampCall(function () {
-    amp.setTransport("beacon");
-    amp.track("App Redirect", { browser: browser, method: method, route: "/app", referrer: document.referrer });
-    // send now by beacon: iOS pauses the batch timer once the App Store is in front
-    amp.flush();
+    landingSent = ampReady.then(function () {
+      amp.setTransport("beacon");
+      amp.track("App Redirect", { browser: browser, method: method, route: "/app", referrer: document.referrer });
+      // send now by beacon: iOS pauses the batch timer once the App Store is in front
+      return amp.flush().promise;
+    });
   });
 
   // leaving the page within 6s of landing without having tapped the badge
@@ -293,7 +303,16 @@
 
   // TODO Android: redirect to the Play Store listing once the Android app ships
   if (!isIOS) {
-    window.location.replace(APP_STORE_URL);
+    // jump once the landing beacon is queued, or after 400ms, whichever first;
+    // at once if the SDK never loaded
+    var jumped = false;
+    var jump = function () {
+      if (jumped) return;
+      jumped = true;
+      window.location.replace(APP_STORE_URL);
+    };
+    landingSent.then(jump, jump);
+    setTimeout(jump, 400);
     return;
   }
 
