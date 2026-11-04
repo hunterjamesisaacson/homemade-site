@@ -40,10 +40,14 @@
     text-align: center;
   }
 
-  h1 {
-    font-size: 34px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+  h1 { line-height: 0; }
+
+  /* The app's wordmark, black ink as on the white theme */
+  h1 img {
+    display: block;
+    width: 240px;
+    max-width: 100%;
+    height: auto;
   }
 
   .phone {
@@ -109,7 +113,7 @@
 </head>
 <body>
 
-  <h1>Homemade</h1>
+  <h1><img src="homemade-wordmark.svg" alt="Homemade" width="1146" height="197"></h1>
 
   <div class="phone">
     <img src="phone-home-shelf.jpg" alt="">
